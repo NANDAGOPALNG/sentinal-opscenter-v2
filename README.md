@@ -2,7 +2,7 @@
 
 **Autonomous multi-agent incident response platform for Site Reliability Engineering**
 
-Sentinal OpsCenter V2 is an agentic SRE workflow engine that ingests production incidents, orchestrates a coordinated team of AI agents through a structured response pipeline, and persists a full audit trail — from triage to remediation — in a queryable API.
+Sentinal OpsCenter V2 is an agentic SRE workflow engine that ingests production incidents, orchestrates a coordinated team of AI agents through a structured response pipeline, and persists a full audit trail from triage to remediation in a queryable API.
 
 ---
 
