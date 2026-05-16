@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.models.incident import IncidentWorkflow
@@ -22,9 +24,17 @@ async def create_workflow(db: AsyncSession, state: WorkflowState) -> IncidentWor
         error=state.error,
         pr_url=state.pr_url,
         trace_id=state.trace_id,
+        dedupe_key=state.dedupe_key,
     )
     db.add(workflow)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        existing = await get_workflow_by_dedupe_key(db, state.dedupe_key)
+        if existing is not None:
+            return existing
+        raise
     await db.refresh(workflow)
     return workflow
 
@@ -47,7 +57,20 @@ async def update_workflow(db: AsyncSession, state: WorkflowState) -> IncidentWor
     workflow.error = state.error
     workflow.pr_url = state.pr_url
     workflow.trace_id = state.trace_id
+    workflow.dedupe_key = state.dedupe_key
 
     await db.commit()
     await db.refresh(workflow)
     return workflow
+
+
+async def get_workflow_by_dedupe_key(
+    db: AsyncSession,
+    dedupe_key: str | None,
+) -> IncidentWorkflow | None:
+    if not dedupe_key:
+        return None
+    result = await db.execute(
+        select(IncidentWorkflow).where(IncidentWorkflow.dedupe_key == dedupe_key)
+    )
+    return result.scalar_one_or_none()

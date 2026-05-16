@@ -49,6 +49,7 @@ async def _ensure_incident_workflow_columns(conn) -> None:
         "error": "TEXT",
         "pr_url": "VARCHAR(2048)",
         "trace_id": "VARCHAR(64)",
+        "dedupe_key": "VARCHAR(255)",
     }
 
     for column_name, column_definition in columns.items():
@@ -59,3 +60,12 @@ async def _ensure_incident_workflow_columns(conn) -> None:
                     f"ADD COLUMN {column_name} {column_definition}"
                 )
             )
+
+    await conn.execute(
+        text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS "
+            "ix_incident_workflows_dedupe_key "
+            "ON incident_workflows (dedupe_key) "
+            "WHERE dedupe_key IS NOT NULL"
+        )
+    )

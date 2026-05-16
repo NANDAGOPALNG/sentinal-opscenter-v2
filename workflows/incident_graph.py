@@ -56,7 +56,14 @@ async def researcher_node(value: WorkflowState | dict[str, Any]) -> dict[str, An
     logger.info("Workflow %s entering researcher node", state.incident_id)
 
     query = _incident_description(state)
-    state.findings["research"] = await ResearcherAgent().research(query)
+    researcher = ResearcherAgent()
+    research_result = await researcher.research(query)
+    state.findings["research"] = research_result.get("summary", "")
+    state.findings["web_search"] = research_result.get("web_search")
+    state.findings["github_context"] = research_result.get("github_context")
+    state.findings["github_files"] = research_result.get("github_files", [])
+    state.findings["research_errors"] = research_result.get("errors", [])
+    state.findings["research_prompt"] = researcher.format_for_prompt(research_result)
     state.status = "researched"
     return _dump_state(state)
 
@@ -66,7 +73,7 @@ async def fix_node(value: WorkflowState | dict[str, Any]) -> dict[str, Any]:
     state.current_step = "fixer"
     logger.info("Workflow %s entering fixer node", state.incident_id)
 
-    research = str(state.findings.get("research", ""))
+    research = str(state.findings.get("research_prompt") or state.findings.get("research", ""))
     state.fix_proposal = await FixerAgent().propose_fix(_incident_description(state), research)
     state.status = "fix_proposed"
     return _dump_state(state)
@@ -77,12 +84,13 @@ async def validate_node(value: WorkflowState | dict[str, Any]) -> dict[str, Any]
     state.current_step = "validator"
     logger.info("Workflow %s entering validator node", state.incident_id)
 
-    passed, message = await ValidatorAgent().validate(state.fix_proposal or "")
+    passed, report = await ValidatorAgent().validate(state.fix_proposal or "")
     state.validation_passed = passed
-    state.findings["validation"] = message
+    state.findings["validation"] = report
     state.status = "validated" if passed else "validation_failed"
     if not passed:
         state.retry_count += 1
+        state.findings["last_validation_failure"] = report
     return _dump_state(state)
 
 
@@ -90,6 +98,11 @@ async def retry_node(value: WorkflowState | dict[str, Any]) -> dict[str, Any]:
     state = _state_from(value)
     state.current_step = "retry"
     state.status = "retrying"
+    state.findings["retry_guidance"] = (
+        "Previous fix proposal failed validation. Create a more detailed proposal "
+        "with explicit investigation, validation, rollback/risk language, and no "
+        "claims that external changes were already applied."
+    )
     logger.info(
         "Workflow %s retrying after validation failure (%s/%s)",
         state.incident_id,

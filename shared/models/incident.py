@@ -35,6 +35,7 @@ class IncidentWorkflow(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     pr_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     trace_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    dedupe_key: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,

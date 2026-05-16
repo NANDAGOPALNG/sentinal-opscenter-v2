@@ -25,7 +25,9 @@ class FixerAgent:
         prompt = (
             "You are the fixer agent in an autonomous SRE workflow. "
             "Draft a concise, safe remediation proposal. Do not claim to have made "
-            "external changes, opened PRs, or contacted services.\n\n"
+            "external changes, opened PRs, or contacted services. Include explicit "
+            "investigation steps, validation steps, risk/rollback considerations, "
+            "and monitoring follow-up.\n\n"
             f"Incident:\n{incident}\n\n"
             f"Research:\n{research}"
         )

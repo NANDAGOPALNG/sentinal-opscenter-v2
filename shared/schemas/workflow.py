@@ -22,3 +22,4 @@ class WorkflowState(BaseModel):
     error: str | None = None
     pr_url: str | None = None
     trace_id: str | None = None
+    dedupe_key: str | None = None

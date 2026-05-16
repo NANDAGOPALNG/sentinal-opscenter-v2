@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     # Tool Integrations (optional, defaults to empty strings)
     github_token: str = os.getenv("GITHUB_TOKEN", "")
     github_repository: str = os.getenv("GITHUB_REPOSITORY", "")
+    github_webhook_secret: str = os.getenv("GITHUB_WEBHOOK_SECRET", "")
     tavily_api_key: str = os.getenv("TAVILY_API_KEY", "")
     discord_webhook_url: str = os.getenv("DISCORD_WEBHOOK_URL", "")
 

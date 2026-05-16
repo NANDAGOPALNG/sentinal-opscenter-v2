@@ -4,6 +4,7 @@ import logging
 import uuid
 from typing import Any
 
+from agents.notifier.notifier import NotifierAgent
 from apps.api.db.crud import create_workflow, update_workflow
 from apps.api.db.database import AsyncSessionLocal
 from shared.schemas.workflow import WorkflowState
@@ -13,21 +14,36 @@ from workflows.incident_graph import build_workflow
 logger = logging.getLogger(__name__)
 
 
-async def run_incident_workflow(event_type: str, payload: dict[str, Any]) -> WorkflowState:
-    incident_id = str(uuid.uuid4())
-    trace_id = str(uuid.uuid4())
+async def run_incident_workflow(
+    event_type: str,
+    payload: dict[str, Any],
+    dedupe_key: str | None = None,
+    incident_id: str | None = None,
+    trace_id: str | None = None,
+    persist_initial_state: bool = True,
+) -> WorkflowState:
+    incident_id = incident_id or str(uuid.uuid4())
+    trace_id = trace_id or str(uuid.uuid4())
     state = WorkflowState(
         incident_id=incident_id,
         event_type=event_type,
         payload=payload,
         status="created",
         trace_id=trace_id,
+        dedupe_key=dedupe_key,
     )
 
     logger.info("Starting workflow %s for event_type=%s", incident_id, event_type)
+    notifier = NotifierAgent()
 
+    if persist_initial_state:
+        async with AsyncSessionLocal() as db:
+            await create_workflow(db, state)
+
+    start_notification = await notifier.notify_started(state)
+    state.findings.setdefault("notifications", []).append(start_notification)
     async with AsyncSessionLocal() as db:
-        await create_workflow(db, state)
+        await update_workflow(db, state)
 
     try:
         app = build_workflow()
@@ -42,6 +58,9 @@ async def run_incident_workflow(event_type: str, payload: dict[str, Any]) -> Wor
                 "error": str(exc),
             }
         )
+
+    finish_notification = await notifier.notify_finished(final_state)
+    final_state.findings.setdefault("notifications", []).append(finish_notification)
 
     async with AsyncSessionLocal() as db:
         await update_workflow(db, final_state)
